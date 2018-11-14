@@ -1,0 +1,310 @@
+﻿@model GrogotApp.Models.PersonViewModel
+@{
+    Layout = null;
+}
+
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"
+        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+        crossorigin="anonymous"></script>
+<script src="~/js/bootstrap.min.js"></script>
+<link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css" rel="stylesheet" />
+<link href="~/css/bootstrap.min.css" rel="stylesheet" />
+<link href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css" rel="stylesheet">
+<link href="~/Styles/StyleSheet.css" rel="stylesheet" />
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+
+
+
+<div class="container" style="margin-top:3%">
+    <a href="#" class="btn btn-info" onclick="AddNewPerson(0)">Dodaj</a> <br /><br />
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Ime</th>
+                <th>Prezime</th>
+                <th>Broj telefona</th>
+                <th>Pol</th>
+                <th>Email</th>
+                <th>Država</th>
+                <th>Grad</th>
+                <th>Datum rođenja</th>
+                <th>Izmijeni</th>
+                <th>Izbriši</th>
+            </tr>
+        </thead>
+        <tbody id="SetPeopleList">
+            <tr id="LoadingStatus" style="color:darkred"></tr>
+        </tbody>
+    </table>
+
+    <div class="modal fade" id="MyModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 id="ModalTitle"></h4>
+                    <a href="#" class="close" data-dismiss="modal">&times;</a>
+                </div>
+                <div class="modal-body">
+                    <form id="form" name="Form">
+                        <fieldset id="SubmitForm">
+                            @Html.HiddenFor(m => m.PersonId, new { @id = "PersonId" })
+                            <div class="form-group">
+                                @Html.TextBoxFor(m => m.FirstName, new { @id = "FirstName", @class = "form-control", @placeholder = "Ime", required = "required" })
+                            </div>
+                            <div class="form-group">
+                                @Html.TextBoxFor(m => m.LastName, new { @id = "LastName", @class = "form-control", @placeholder = "Prezime", required = "required" })
+                            </div>
+                            <div class="form-group">
+                                @Html.TextBoxFor(m => m.PhoneNumber, new { @id = "PhoneNumber", @class = "form-control", @placeholder = "Broj telefona xxx/xxx-xxx" })
+                            </div>
+                            <div class="dropdown">
+                                @Html.DropDownListFor(m => m.Sex, ViewBag.genders as SelectList, "--Izaberi pol--", new { @id = "Sex", @class = "form-control", required = "required" })
+                            </div>
+                            <div class="form-group">
+                                @Html.TextBoxFor(m => m.Email, new { @id = "Email", @class = "form-control", @placeholder = "Email", required = "required" })
+                            </div>
+                            <div class="dropdown">
+                                @Html.DropDownListFor(m => m.CountryId, ViewBag.countries as SelectList, "--Izaberi državu--", new { @id = "Country", @class = "form-control", @onchange = "javascript:GetCities(this.value)", required = "required", @placeholder = "Datum rođenja YYYY-MM-DD" })
+                            </div>
+                            <select id="City" name="CityId" required="required"></select>
+                            <div class="form-group">
+                                @Html.EditorFor(m => m.DOB, new { htmlAttributes = new { @id = "DOB", @class = "form-control datepicker", @placeholder = "Datum rođenja YYYY-MM-DD" } })
+                            </div>
+                            <div class="form-group">
+                                <a href="#" class="btn btn-block btn-success" id="SavePersonRecord">Sačuvaj</a>
+                                <a href="#" class="btn btn-block btn-warning" id="CancelPersonRecord">Odustani</a>
+                            </div>
+                        </fieldset>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="DeleteConfirmation">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4>Izbriši</h4>
+                    <a href="#" class="close" data-dismiss="modal">&times;</a>
+                </div>
+                <div class="modal-body">
+                    <h4>Jeste li sigurni da želite izbrisati ovu osobu?</h4>
+                </div>
+                <div class="modal-footer">
+                    <a href="#" class="btn btn-primary" data-dismiss="modal">Odustani</a>
+                    <a href="#" class="btn btn-danger" onclick="ConfirmDelete()">Izbriši</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $("#LoadingStatus").html("Loading...");
+    $.get("/Home/GetPeopleList", null, DataBind);
+    let deletePersonId;
+    let _this = this;
+
+    function GetCities(CountryId) {
+        var url = "/Home/GetCities?countryId=" + CountryId;
+        $.ajax({
+            url: url,
+            type: "POST",
+            async: false,
+            success: function (data) {
+                let json = JSON.parse(data);
+                var markup = "<option value='0'>--Izaberi grad--</option>";
+                for (let i = 0; i < json.length; i++) {
+                    markup += "<option value=" + json[i].CityId + ">" + json[i].CityName + "</option>";
+                }
+                $("#City").html(markup).show();
+            }
+        });
+    }
+
+    function DataBind(PeopleList) {
+        var SetData = $("#SetPeopleList");
+        for (let i = 0; i < PeopleList.length; i++) {
+            console.log(PeopleList[i]);
+            let Data = "<tr class='row_" + PeopleList[i].PersonId + "'>" +
+                "<td>" + PeopleList[i].FirstName + "</td>" +
+                "<td>" + PeopleList[i].LastName + "</td>" +
+                "<td>" + PeopleList[i].PhoneNumber + "</td>" +
+                "<td>" + _this.GetSexColor(PeopleList[i].Sex) + "</td>" +
+                "<td>" + PeopleList[i].Email + "</td>" +
+                "<td>" + _this.GetCountry(PeopleList[i].CountryId) + "</td>" +
+                "<td>" + _this.GetCity(PeopleList[i].CityId) + "</td>" +
+                "<td>" + _this.GetDate(PeopleList[i].PersonId) + "</td>" +
+                "<td>" + "<a href='#' class='btn btn-warning' onclick='EditPersonRecord(" + PeopleList[i].PersonId + ")'><span class='glyphicon glyphicon-edit'></span></a>" + "</td>" +
+                "<td>" + "<a href='#' class='btn btn-danger' onclick='DeletePersonRecord(" + PeopleList[i].PersonId + ")'><span class='glyphicon glyphicon-trash'></span></a>" + "</td>" +
+                "</tr>";
+            SetData.append(Data);
+            $("#LoadingStatus").html(" ");
+        }
+    }
+
+    function GetDate(personId) {
+        var url = "/Home/GetDate?personId=" + personId;
+        var returnData;
+        $.ajax({
+            url: url,
+            type: "POST",
+            async: false,
+            success: function (data) {
+                returnData = data;
+            }
+        });
+        return returnData;
+    }
+
+    function GetCountry(CountryId) {
+        var url = "/Home/GetCountry?countryId=" + CountryId;
+        var returnData;
+        $.ajax({
+            url: url,
+            type: "POST",
+            async: false,
+            success: function (data) {
+                let json = JSON.parse(data);
+                returnData = json.CountryName;
+            }
+        });
+        return returnData;
+    }
+
+    function GetCity(CityId) {
+        var url = "/Home/GetCity?cityId=" + CityId;
+        var returnData;
+        $.ajax({
+            url: url,
+            type: "POST",
+            async: false,
+            success: function (data) {
+                let json = JSON.parse(data);
+                returnData = json.CityName;
+            }
+        });
+        return returnData;
+    }
+
+    function GetSexColor(sex) {
+        if (sex === false) return "<span class='glyphicon glyphicon-certificate' style='color:blue'></span>";
+        else return "<span class='glyphicon glyphicon-certificate' style='color:red'></span>";
+    }
+
+    function GetSexId(sex) {
+        if (sex === false) return 0;
+        else return 1;
+    }
+
+    function AddNewPerson(PersonId) {
+        $("#form")[0].reset();
+        $("#PersonId").val(0);
+        $("#Country option:selected").text("--Država--");
+        $("#City option:selected").text("--Grad--");
+        $("#ModalTitle").html("Dodaj novu osobu");
+        $("#MyModal").modal();
+    }
+
+    function EditPersonRecord(PersonId) {
+        var url = "/Home/GetPersonById?personId=" + PersonId;
+        $("#ModalTitle").html("Izmijeni lične podatke");
+        $("#MyModal").modal();
+        $.ajax({
+            type: "GET",
+            url: url,
+            success: function (data) {
+                var obj = JSON.parse(data);
+                _this.GetCities(obj.CountryId);
+                $("#PersonId").val(obj.PersonId);
+                $("#FirstName").val(obj.FirstName);
+                $("#LastName").val(obj.LastName);
+                $("#PhoneNumber").val(obj.PhoneNumber);
+                $("#Sex").val(_this.GetSexId(obj.Sex));
+                $("#Email").val(obj.Email);
+                $("#DOB").val(obj.DOB.substring(0, 10));
+                $("#Country").val(obj.CountryId);
+                $("#City").val(obj.CityId);
+            }
+        })
+    }
+
+    function CheckValidity() {
+        var firstName = document.forms["Form"]["FirstName"].value;
+        var lastName = document.forms["Form"]["LastName"].value;
+        var phoneNumber = document.forms["Form"]["PhoneNumber"].value;
+        var sex = document.forms["Form"]["Sex"].value;
+        var email = document.forms["Form"]["Email"].value;
+        var country = document.forms["Form"]["Country"].value;
+        var city = document.forms["Form"]["CityId"].value;
+        var dob = document.forms["Form"]["DOB"].value;
+        console.log(dob);
+        if (!firstName || !lastName || !phoneNumber || !sex || !email || !country || !city || !dob) {
+            alert("Popunite sva polja");
+            return false;
+        } else if (phoneNumber.length != 11 || !_this.CheckRegex(phoneNumber, /[0-9]{3}\/[0-9]{3}-[0-9]{3}/g)) {
+            alert("Broj mora biti u formatu xxx/xxx-xxx");
+            return false;
+        } else if (!_this.CheckRegex(email, /[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:[A-Z]{2}|com|org|net|gov|mil|biz|info|mobi|name|aero|jobs|museum)\b/i)) {
+            alert("Email mora biti u formatu xxx@xxx.xxx");
+            return false;
+        } else if (dob.length != 10 || !_this.CheckRegex(dob, /[0-9]{4}-[0-1][0-2]-[0-3][0-9]/g)) {
+            alert("Datum rođenja mora biti u formatu YYYY-MM-DD");
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    function CheckRegex(string, regex) {
+        if (string.slice(5,7) == "00" || string.slice(8-10) == "00" || (string.slice(8,9) == "3" && (string.slice(9,10) != "0" && string.slice(9,10) != "1"))) {
+            return false;
+        }
+        return regex.test(string);
+    }
+
+    $("#SavePersonRecord").click(function () {
+        if (!CheckValidity()) return;
+        var data = $("#SubmitForm").serialize();
+        var modifiedData = parseSex(data);
+        $.ajax({
+            type: "POST",
+            url: "/Home/SaveDataInDatabase",
+            data: modifiedData,
+            success: function (result) {
+                alert("Uspiješno!");
+                window.location.href = "/Home/index";
+                $("#MyModal").modal("hide");
+            }
+        })
+    })
+
+    function parseSex(data) {
+        var data1 = data.replace(/Sex=0/i, "Sex=false");
+        var data2 = data1.replace(/Sex=1/i, "Sex=true");
+        return data2;
+    }
+
+    $("#CancelPersonRecord").click(function () {
+        $("#MyModal").modal("hide");
+    })
+
+    function DeletePersonRecord(PersonId) {
+        this.deletePersonId = PersonId;
+        $("#DeleteConfirmation").modal();
+    }
+
+    function ConfirmDelete() {
+        var personId = this.deletePersonId;
+        $.ajax({
+            type: "POST",
+            url: "/Home/DeletePersonRecord?PersonId=" + personId,
+            success: function (result) {
+                $("#DeleteConfirmation").modal("hide");
+                $(".row_" + personId).remove();
+            }
+        })
+    }
+</script>
